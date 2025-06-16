@@ -1,110 +1,227 @@
-// import { Image } from 'expo-image';
-// import { Platform, StyleSheet } from 'react-native';
+// app/(tabs)/explore.tsx
+import { useTasks } from '@/contexts/TasksContext'; // ✅ contexto compartido
+import { Feather } from '@expo/vector-icons';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import React, { useMemo, useState } from 'react';
+import {
+  Alert,
+  Pressable,
+  SafeAreaView,
+  SectionList,
+  StyleSheet,
+  Text,
+  useColorScheme,
+  View,
+} from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
+dayjs.extend(relativeTime);
 
-// import { Collapsible } from '@/components/Collapsible';
-// import { ExternalLink } from '@/components/ExternalLink';
-// import ParallaxScrollView from '@/components/ParallaxScrollView';
-// import { ThemedText } from '@/components/ThemedText';
-// import { ThemedView } from '@/components/ThemedView';
-// import { IconSymbol } from '@/components/ui/IconSymbol';
+/* ---------- Constantes ---------- */
+const FILTERS = ['Todas', 'Activas', 'Completadas'] as const;
+type Filter = typeof FILTERS[number];
 
-// export default function TabTwoScreen() {
-//   return (
-//     <ParallaxScrollView
-//       headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-//       headerImage={
-//         <IconSymbol
-//           size={310}
-//           color="#808080"
-//           name="chevron.left.forwardslash.chevron.right"
-//           style={styles.headerImage}
-//         />
-//       }>
-//       <ThemedView style={styles.titleContainer}>
-//         <ThemedText type="title">Explore</ThemedText>
-//       </ThemedView>
-//       <ThemedText>This app includes example code to help you get started.</ThemedText>
-//       <Collapsible title="File-based routing">
-//         <ThemedText>
-//           This app has two screens:{' '}
-//           <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-//           <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-//         </ThemedText>
-//         <ThemedText>
-//           The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-//           sets up the tab navigator.
-//         </ThemedText>
-//         <ExternalLink href="https://docs.expo.dev/router/introduction">
-//           <ThemedText type="link">Learn more</ThemedText>
-//         </ExternalLink>
-//       </Collapsible>
-//       <Collapsible title="Android, iOS, and web support">
-//         <ThemedText>
-//           You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-//           <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-//         </ThemedText>
-//       </Collapsible>
-//       <Collapsible title="Images">
-//         <ThemedText>
-//           For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-//           <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-//           different screen densities
-//         </ThemedText>
-//         <Image source={require('@/assets/images/react-logo.png')} style={{ alignSelf: 'center' }} />
-//         <ExternalLink href="https://reactnative.dev/docs/images">
-//           <ThemedText type="link">Learn more</ThemedText>
-//         </ExternalLink>
-//       </Collapsible>
-//       <Collapsible title="Custom fonts">
-//         <ThemedText>
-//           Open <ThemedText type="defaultSemiBold">app/_layout.tsx</ThemedText> to see how to load{' '}
-//           <ThemedText style={{ fontFamily: 'SpaceMono' }}>
-//             custom fonts such as this one.
-//           </ThemedText>
-//         </ThemedText>
-//         <ExternalLink href="https://docs.expo.dev/versions/latest/sdk/font">
-//           <ThemedText type="link">Learn more</ThemedText>
-//         </ExternalLink>
-//       </Collapsible>
-//       <Collapsible title="Light and dark mode components">
-//         <ThemedText>
-//           This template has light and dark mode support. The{' '}
-//           <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-//           what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-//         </ThemedText>
-//         <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-//           <ThemedText type="link">Learn more</ThemedText>
-//         </ExternalLink>
-//       </Collapsible>
-//       <Collapsible title="Animations">
-//         <ThemedText>
-//           This template includes an example of an animated component. The{' '}
-//           <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-//           the powerful <ThemedText type="defaultSemiBold">react-native-reanimated</ThemedText>{' '}
-//           library to create a waving hand animation.
-//         </ThemedText>
-//         {Platform.select({
-//           ios: (
-//             <ThemedText>
-//               The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-//               component provides a parallax effect for the header image.
-//             </ThemedText>
-//           ),
-//         })}
-//       </Collapsible>
-//     </ParallaxScrollView>
-//   );
-// }
+/* ---------- Pantalla ---------- */
+export default function ExploreScreen() {
+  const { tasks, toggleTask, deleteTask, editTask } = useTasks(); // ✅
+  const [filter, setFilter] = useState<Filter>('Todas');
+  const scheme = useColorScheme();
+  const isDark = scheme === 'light';
 
-// const styles = StyleSheet.create({
-//   headerImage: {
-//     color: '#808080',
-//     bottom: -90,
-//     left: -35,
-//     position: 'absolute',
-//   },
-//   titleContainer: {
-//     flexDirection: 'row',
-//     gap: 8,
-//   },
-// });
+  /* --------- Filtro + agrupación --------- */
+  const sections = useMemo(() => {
+    /* 1. Filtrar */
+    let filtered = tasks;
+    if (filter === 'Activas') filtered = tasks.filter(t => !t.done);
+    if (filter === 'Completadas') filtered = tasks.filter(t => t.done);
+
+    /* 2. Agrupar por día */
+    const buckets: Record<string, typeof tasks> = {};
+    filtered.forEach(t => {
+      const date = t.completedAt ?? t.id;          // si no está hecha, usa creación
+      const key = groupKey(date);
+      (buckets[key] ??= []).push(t);
+    });
+
+    /* 3. Formato SectionList */
+    return Object.entries(buckets).map(([title, data]) => ({ title, data }));
+  }, [tasks, filter]);
+
+  return (
+    <SafeAreaView
+      style={[
+        { marginTop: 16 },
+        styles.container,
+        { backgroundColor: isDark ? '#000' : '#f2f2f7' },
+      ]}>
+      {/* Filtros ----------------------------------------------------------- */}
+      <View style={styles.filterRow}>
+        {FILTERS.map(f => (
+          <Pressable
+            key={f}
+            onPress={() => setFilter(f)}
+            style={[
+              styles.filterBtn,
+              {
+                backgroundColor:
+                  filter === f
+                    ? isDark
+                      ? '#1e40af'
+                      : '#2563eb'
+                    : 'transparent',
+                borderColor: isDark ? '#444' : '#ccc',
+              },
+            ]}>
+            <Text
+              style={[
+                styles.filterTxt,
+                {
+                  color:
+                    filter === f
+                      ? '#fff'
+                      : isDark
+                      ? '#e5e5e5'
+                      : '#333',
+                },
+              ]}>
+              {f}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {/* Lista ------------------------------------------------------------- */}
+      <SectionList
+        sections={sections}
+        keyExtractor={item => item.id}
+        renderSectionHeader={({ section: { title } }) => (
+          <Text
+            style={[
+              styles.sectionTitle,
+              { color: isDark ? '#9aa' : '#666' },
+            ]}>
+            {title}
+          </Text>
+        )}
+        renderItem={({ item }) => (
+          <Swipeable
+            renderRightActions={() => (
+              <Pressable
+                style={styles.deleteBtn}
+                onPress={() => deleteTask(item.id)}>
+                <Feather name="trash-2" size={20} color="#fff" />
+              </Pressable>
+            )}>
+            <Pressable
+              onPress={() => toggleTask(item.id)}
+              onLongPress={() =>
+                Alert.prompt(
+                  'Editar tarea',
+                  '',
+                  text => text !== null && editTask(item.id, text.trim()),
+                  'plain-text',
+                  item.title,
+                )
+              }
+              style={[
+                styles.taskCard,
+                { backgroundColor: isDark ? '#1f1f1f' : '#fff' },
+              ]}>
+              <Text
+                style={[
+                  styles.taskText,
+                  item.done && styles.taskDone,
+                  { color: isDark ? '#e5e5e5' : '#333' },
+                ]}>
+                {item.title}
+              </Text>
+              {item.done && (
+                <Feather
+                  name="check-circle"
+                  size={18}
+                  color={isDark ? '#4ade80' : '#22c55e'}
+                />
+              )}
+            </Pressable>
+          </Swipeable>
+        )}
+        ListEmptyComponent={
+          <View style={styles.emptyBox}>
+            <Feather
+              name="filter"
+              size={64}
+              color={isDark ? '#444' : '#ccc'}
+            />
+            <Text
+              style={[
+                styles.emptyText,
+                { color: isDark ? '#666' : '#888' },
+              ]}>
+              No hay tareas en este filtro
+            </Text>
+          </View>
+        }
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+      />
+    </SafeAreaView>
+  );
+}
+
+/* ---------- Helpers ---------- */
+const groupKey = (ts: number | string) => {
+  const d = dayjs(Number(ts));
+  if (d.isSame(dayjs(), 'day')) return 'Hoy';
+  if (d.isSame(dayjs().subtract(1, 'day'), 'day')) return 'Ayer';
+  if (d.isAfter(dayjs().subtract(7, 'day'))) return 'Esta semana';
+  return d.format('MMMM YYYY');
+};
+
+/* ---------- Estilos ---------- */
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  /* filtros */
+  filterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 16,
+    marginHorizontal: 12,
+  },
+  filterBtn: {
+    flex: 1,
+    marginHorizontal: 4,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  filterTxt: { fontSize: 14, fontWeight: '600' },
+  /* lista */
+  list: { paddingHorizontal: 16, paddingBottom: 120 },
+  sectionTitle: { fontSize: 14, fontWeight: '700', marginTop: 24 },
+  taskCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderRadius: 12,
+    marginTop: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    shadowOffset: { height: 2, width: 0 },
+    elevation: 1,
+  },
+  taskText: { fontSize: 16 },
+  taskDone: { textDecorationLine: 'line-through', opacity: 0.6 },
+  deleteBtn: {
+    backgroundColor: '#ff3b30',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 70,
+    borderRadius: 12,
+    marginVertical: 1,
+  },
+  /* empty */
+  emptyBox: { alignItems: 'center', marginTop: 64 },
+  emptyText: { marginTop: 12, fontSize: 16 },
+});

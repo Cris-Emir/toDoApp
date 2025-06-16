@@ -1,6 +1,6 @@
+import { useTasks } from '@/contexts/TasksContext';
 import { Feather } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -14,51 +14,20 @@ import {
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 
-/* ---------- Tipos ---------- */
-interface Task {
-  id: string;
-  title: string;
-  done: boolean;
-}
-const STORAGE_KEY = '@tasks';
-const createTask = (title: string): Task => ({
-  id: Date.now().toString(),
-  title,
-  done: false,
-});
-
 export default function HomeScreen() {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const { tasks, addTask, toggleTask, deleteTask } = useTasks(); // ✅ usa contexto
   const [text, setText] = useState('');
+  const inputRef = useRef<TextInput>(null);
   const scheme = useColorScheme();
-  const isDark = scheme === 'dark';
+  const isDark = scheme === 'light';
 
-  /* Persistencia */
-  useEffect(() => {
-    (async () => {
-      const raw = await AsyncStorage.getItem(STORAGE_KEY);
-      if (raw) setTasks(JSON.parse(raw));
-    })();
-  }, []);
-  useEffect(() => {
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-  }, [tasks]);
-
-  /* CRUD */
-  const addTask = () => {
+  const handleAdd = () => {
     if (!text.trim()) return;
-    setTasks(prev => [...prev, createTask(text.trim())]);
+    addTask(text.trim());
     setText('');
   };
-  const toggleTask = (id: string) =>
-    setTasks(prev =>
-      prev.map(t => (t.id === id ? { ...t, done: !t.done } : t)),
-    );
-  const deleteTask = (id: string) =>
-    setTasks(prev => prev.filter(t => t.id !== id));
 
-  /* Render */
-  const renderTask = ({ item }: { item: Task }) => (
+  const renderTask = ({ item }: { item: typeof tasks[number] }) => (
     <Swipeable
       renderRightActions={() => (
         <Pressable
@@ -108,6 +77,7 @@ export default function HomeScreen() {
         style={[
           styles.inputCard,
           {
+            marginTop: 16,
             backgroundColor: isDark ? '#1c1c1e' : '#fff',
             shadowOpacity: isDark ? 0 : 0.1,
           },
@@ -118,12 +88,13 @@ export default function HomeScreen() {
           color={isDark ? '#fff' : '#888'}
         />
         <TextInput
+          ref={inputRef}
           value={text}
           onChangeText={setText}
           placeholder="Escribe una tarea..."
           placeholderTextColor={isDark ? '#7d7d7d' : '#999'}
           style={[styles.input, { color: isDark ? '#fff' : '#000' }]}
-          onSubmitEditing={addTask}
+          onSubmitEditing={handleAdd}
           returnKeyType="done"
         />
       </View>
@@ -153,8 +124,10 @@ export default function HomeScreen() {
         }
       />
 
-      {/* FAB */}
-      <Pressable style={styles.fab} onPress={addTask}>
+      {/* FAB que enfoca input */}
+      <Pressable
+        style={styles.fab}
+        onPress={() => inputRef.current?.focus()}>
         <Feather name="plus" size={28} color="#fff" />
       </Pressable>
     </SafeAreaView>
